@@ -36,3 +36,12 @@
     transform: rotate(360deg);
   }
 }
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: #09090b;
+}
