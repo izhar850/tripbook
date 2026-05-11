@@ -184,6 +184,7 @@ export default function App() {
               <Field
                 icon={<Calendar size={15} />}
                 placeholder="Trip date"
+                type = "date"
                 value={form.date}
                 onChange={(v) => update("date", v)}
               />
