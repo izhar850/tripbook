@@ -6,7 +6,7 @@ import TripTable from "../components/TripTable";
 import { useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { logoutUser } from "../services/authService";
-
+import { Package, Weight } from "lucide-react";
 
 
 
@@ -35,7 +35,8 @@ import {
   query,
   where,
   getDoc,
-  setDoc
+  setDoc,
+  runTransaction
 } from "firebase/firestore";
 
 const emptyForm = {
@@ -48,6 +49,10 @@ const emptyForm = {
   rate: "",
   advance: "",
   notes: "",
+  lrNo: "",
+  packages: "",
+  weight: "",
+  unloadingCharges: "",
 };
 
 
@@ -150,6 +155,29 @@ function handleLogout() {
   const snap = await getDocs(q);
   setTrips(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
 }
+async function generateNextLrNo(uid) {
+  const counterRef = doc(db, "counters", uid);
+
+  const nextNo = await runTransaction(db, async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+
+    const lastNo = counterDoc.exists()
+      ? counterDoc.data().lastLrNo || 0
+      : 0;
+
+    const newNo = lastNo + 1;
+
+    transaction.set(
+      counterRef,
+      { lastLrNo: newNo },
+      { merge: true }
+    );
+
+    return newNo;
+  });
+
+  return `LR-${String(nextNo).padStart(4, "0")}`;
+}
 async function loadParties(uid) {
   const q = query(
     collection(db, "parties"),
@@ -165,10 +193,18 @@ async function loadParties(uid) {
     }))
   );
 }
-  const balance = useMemo(
-    () => Math.max(Number(form.rate || 0) - Number(form.advance || 0), 0),
-    [form.rate, form.advance]
-  );
+
+const totalAmount =
+  Number(form.rate || 0) +
+  Number(form.unloadingCharges || 0);
+
+const balanceAmount =
+  totalAmount - Number(form.advance || 0);
+
+//   const balance = useMemo(
+//     () => Math.max(Number(form.rate || 0) - Number(form.advance || 0), 0),
+//     [form.rate, form.advance]
+//   );
 
   const filtered = trips.filter((trip) =>
     `${trip.vehicle} ${trip.source} ${trip.destination}`
@@ -211,7 +247,9 @@ async function saveTrip() {
   }
 
   const isEdit = Boolean(editingId);
-
+const finalLrNo = isEdit
+  ? form.lrNo
+  : form.lrNo || (await generateNextLrNo(currentUser.uid));
   const payload = {
     ...form,
     rate: Number(form.rate || 0),
@@ -219,6 +257,7 @@ async function saveTrip() {
     userId: currentUser.uid,
     companyName: userProfile?.companyName || "",
     ownerName: userProfile?.ownerName || "",
+    lrNo: finalLrNo,
   };
 
   if (isEdit) {
@@ -325,10 +364,10 @@ async function updateProfile() {
 }
 
   function openNewTrip() {
-    setEditingId(null);
-    setForm(emptyForm);
-    setShowPanel(true);
-  }
+  setEditingId(null);
+  setForm(emptyForm);
+  setShowPanel(true);
+}
 
   function editTrip(trip) {
     setEditingId(trip.id);
@@ -342,6 +381,11 @@ async function updateProfile() {
       rate: String(trip.rate || ""),
       advance: String(trip.advance || ""),
       notes: trip.notes || "",
+      lrNo: trip.lrNo || "",
+      packages: trip.packages || "",
+      weight: trip.weight || "",
+      unloadingCharges:
+  trip.unloadingCharges || "",
     });
     setShowPanel(true);
   }
@@ -509,6 +553,14 @@ async function updateProfile() {
             </div>
 
             <DateField form={form} update={update} styles={styles}/>
+          {editingId && (
+  <Field
+    icon={<FileText size={15} />}
+    placeholder="L.R. No / Bill No"
+    value={form.lrNo}
+    onChange={(v) => update("lrNo", v)}
+  />
+)}
             <Field icon={<Truck size={15} />} placeholder="Vehicle number" value={form.vehicle} onChange={(v) => update("vehicle", v)}/>
             <div style={styles.selectWrap}>
   <select
@@ -535,9 +587,64 @@ async function updateProfile() {
             <Field icon={<Phone size={15} />} placeholder="Driver mobile" value={form.mobile} onChange={(v) => update("mobile", v)} />
             <Field icon={<IndianRupee size={15} />} placeholder="Rate" value={form.rate} onChange={(v) => update("rate", v)} />
             <Field icon={<IndianRupee size={15} />} placeholder="Advance" value={form.advance} onChange={(v) => update("advance", v)}/>
+            <Field
+  icon={<IndianRupee size={15} />}
+  placeholder="Unloading Charges"
+  value={form.unloadingCharges}
+  onChange={(v) =>
+    update("unloadingCharges", v)
+  }
+/>
+            <Field
+  icon={<Package size={15} />}
+  placeholder="No. of Packages"
+  value={form.packages}
+  onChange={(v) => update("packages", v)}
+/>
+
+<Field
+  icon={<Weight size={15} />}
+  placeholder="Weight"
+  value={form.weight}
+  onChange={(v) => update("weight", v)}
+/>
             <Field icon={<FileText size={15} />} placeholder="Notes" value={form.notes} onChange={(v) => update("notes", v)} />
 
-            <div style={styles.balance}>Balance ₹{balance.toLocaleString()}</div>
+           <div style={styles.amountSummary}>
+  <div style={styles.amountRow}>
+    <span>Total Amount</span>
+
+    <strong>
+      ₹{totalAmount.toLocaleString()}
+    </strong>
+  </div>
+
+  <div style={styles.amountRow}>
+    <span>Advance</span>
+
+    <strong>
+      ₹
+      {Number(
+        form.advance || 0
+      ).toLocaleString()}
+    </strong>
+  </div>
+
+  <div style={styles.amountRow}>
+    <span>Balance</span>
+
+    <strong
+      style={{
+        color:
+          balanceAmount > 0
+            ? "#f87171"
+            : "#22c55e",
+      }}
+    >
+      ₹{balanceAmount.toLocaleString()}
+    </strong>
+  </div>
+</div>
             <button style={styles.saveButton} onClick={saveTrip}>
               {editingId ? "Update Trip" : "Save Trip"}
             </button>

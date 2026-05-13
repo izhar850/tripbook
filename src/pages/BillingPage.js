@@ -10,6 +10,7 @@ import {
   where,
   doc,
 getDoc,
+runTransaction,
 } from "firebase/firestore";
 
 import { auth, db } from "../firebase/firebase";
@@ -29,7 +30,10 @@ const [userProfile, setUserProfile] = useState(null);
 );
 
 const invoiceTotal = selectedTrips.reduce(
-  (sum, trip) => sum + Number(trip.rate || 0) + Number(trip.unloadingCharges || 0),
+  (sum, trip) =>
+    sum +
+    Number(trip.rate || 0) +
+    Number(trip.unloadingCharges || 0),
   0
 );
 
@@ -89,6 +93,29 @@ function toggleTripSelection(tripId) {
       ? prev.filter((id) => id !== tripId)
       : [...prev, tripId]
   );
+}
+async function generateNextBillNo(uid) {
+  const counterRef = doc(db, "billCounters", uid);
+
+  const nextNo = await runTransaction(db, async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+
+    const lastNo = counterDoc.exists()
+      ? counterDoc.data().lastBillNo || 0
+      : 0;
+
+    const newNo = lastNo + 1;
+
+    transaction.set(
+      counterRef,
+      { lastBillNo: newNo },
+      { merge: true }
+    );
+
+    return newNo;
+  });
+
+  return `BILL-${String(nextNo).padStart(4, "0")}`;
 }
   async function loadPartyTrips(uid, partyName) {
   const q = query(
@@ -166,12 +193,16 @@ function toggleTripSelection(tripId) {
       <thead>
         <tr>
           <th style={styles.th}>Select</th>
-          <th style={styles.th}>Date</th>
-          <th style={styles.th}>Vehicle</th>
-          <th style={styles.th}>Route</th>
-          <th style={styles.th}>Rate</th>
-          <th style={styles.th}>Advance</th>
-          <th style={styles.th}>Pending</th>
+          <th style={styles.th}>L.R. No</th>
+        <th style={styles.th}>Date</th>
+        <th style={styles.th}>Party</th>
+        <th style={styles.th}>Pkgs</th>
+        <th style={styles.th}>Weight</th>
+        <th style={styles.th}>Vehicle</th>
+        <th style={styles.th}>Route</th>
+        <th style={styles.th}>Rate</th>
+        <th style={styles.th}>Amount</th>
+          
         </tr>
       </thead>
 
@@ -183,41 +214,30 @@ function toggleTripSelection(tripId) {
 
           return (
             <tr key={trip.id}>
-              <td style={styles.td}>
-                <input
-                  type="checkbox"
-                  checked={selectedTripIds.includes(trip.id)}
-                  onChange={() => toggleTripSelection(trip.id)}
-                />
-              </td>
+             <td style={styles.td}>
+  <input
+    type="checkbox"
+    checked={selectedTripIds.includes(trip.id)}
+    onChange={() => toggleTripSelection(trip.id)}
+  />
+</td>
 
-              <td style={styles.td}>{trip.date}</td>
-              <td style={styles.td}>{trip.vehicle}</td>
+<td style={styles.td}>{trip.lrNo || "-"}</td>
+<td style={styles.td}>{trip.date}</td>
+<td style={styles.td}>{trip.partyName || selectedParty}</td>
+<td style={styles.td}>{trip.packages || "-"}</td>
+<td style={styles.td}>{trip.weight || "-"}</td>
+<td style={styles.td}>{trip.vehicle}</td>
 
-              <td style={styles.td}>
-                {trip.source} → {trip.destination}
-              </td>
+<td style={styles.td}>
+  {trip.source} → {trip.destination}
+</td>
 
-              <td style={styles.td}>
-                ₹{Number(trip.rate || 0).toLocaleString()}
-              </td>
+<td style={styles.td}>Fix</td>
 
-              <td style={styles.td}>
-                ₹{Number(trip.advance || 0).toLocaleString()}
-              </td>
-
-              <td
-                style={{
-                  ...styles.td,
-                  color:
-                    pending > 2000
-                      ? "#f87171"
-                      : "#22c55e",
-                  fontWeight: 700,
-                }}
-              >
-                ₹{pending.toLocaleString()}
-              </td>
+<td style={styles.td}>
+  ₹{Number(trip.rate || 0).toLocaleString()}
+</td>
             </tr>
           );
         })}
@@ -234,18 +254,21 @@ function toggleTripSelection(tripId) {
           Total: ₹{invoiceTotal.toLocaleString()}
         </div>
 
-        <button
+      <button
   style={styles.generateButton}
-  onClick={() =>
+  onClick={async () => {
+    const billNo = await generateNextBillNo(currentUser.uid);
+
     navigate("/invoice-preview", {
       state: {
         selectedParty,
         selectedTrips,
         invoiceTotal,
         userProfile,
+        billNo,
       },
-    })
-  }
+    });
+  }}
 >
   Generate Invoice
 </button>
