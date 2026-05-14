@@ -6,6 +6,7 @@ import AdminPage from "./pages/AdminPage";
 import PartiesPage from "./pages/PartiesPage";
 import BillingPage from "./pages/BillingPage";
 import InvoicePreviewPage from "./pages/InvoicePreviewPage";
+import LrReceiptPreviewPage from "./pages/LrReceiptPreviewPage";
 
 export default function App() {
   return (
@@ -17,6 +18,8 @@ export default function App() {
     <Route path="/parties" element={<PartiesPage />} />
     <Route path="/billing" element={<BillingPage />} />
     <Route path="/invoice-preview" element={<InvoicePreviewPage />} />
+    <Route path="/lr-receipt-preview" element={<LrReceiptPreviewPage />}
+/>
   </Routes>
 </BrowserRouter>
   );

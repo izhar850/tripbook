@@ -448,7 +448,25 @@ partyButton: {
   cursor: "pointer",
   fontWeight: 700,
 },
-
+sizeRow: {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr 1fr",
+  gap: 10,
+  marginBottom: 12,
+},
+invoiceButton: {
+  marginTop: 6,
+  padding: "7px 12px",
+  borderRadius: 10,
+  border: "1px solid rgba(34,197,94,.25)",
+  cursor: "pointer",
+  fontWeight: 600,
+  background: "rgba(34,197,94,.14)",
+  color: "#22c55e",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+},
 };
 
 export default styles

@@ -7,7 +7,10 @@ import { useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { logoutUser } from "../services/authService";
 import { Package, Weight } from "lucide-react";
-
+import {
+  User,
+  StickyNote,
+} from "lucide-react";
 
 
 import Swal from "sweetalert2";
@@ -43,6 +46,9 @@ const emptyForm = {
   date: "",
   vehicle: "",
    partyName: "",
+   partyGst: "",
+partyAddress: "",
+partyMobile: "",
   source: "",
   destination: "",
   mobile: "",
@@ -53,6 +59,15 @@ const emptyForm = {
   packages: "",
   weight: "",
   unloadingCharges: "",
+partyGst: "",
+description: "",
+vehicleType: "",
+sizeL: "",
+sizeW: "",
+sizeH: "",
+rateQtl: "",
+remark: "",
+gstPayBy: "",
 };
 
 
@@ -138,7 +153,27 @@ if (profileSnap.exists()) {
     setLoginError("Invalid username or password");
   }
 }
+function handlePartySelect(partyId) {
+  const selectedParty = parties.find((p) => p.id === partyId);
 
+  if (!selectedParty) {
+    update("partyId", "");
+    update("partyName", "");
+    update("partyGst", "");
+    update("partyAddress", "");
+    update("partyMobile", "");
+    return;
+  }
+
+  setForm((prev) => ({
+    ...prev,
+    partyId: selectedParty.id,
+    partyName: selectedParty.partyName || "",
+    partyGst: selectedParty.gstNo || "",
+    partyAddress: selectedParty.address || "",
+    partyMobile: selectedParty.mobile || "",
+  }));
+}
 function handleLogout() {
   sessionStorage.removeItem("tripbook_auth");
   setIsLoggedIn(false);
@@ -194,12 +229,20 @@ async function loadParties(uid) {
   );
 }
 
-const totalAmount =
-  Number(form.rate || 0) +
+const totalFreight =
+  Number(form.weight || 0) * Number(form.rateQtl || 0);
+
+const unloadingAmount =
   Number(form.unloadingCharges || 0);
 
+const advanceAmount =
+  Number(form.advance || 0);
+
+const totalAmount =
+  totalFreight + unloadingAmount;
+
 const balanceAmount =
-  totalAmount - Number(form.advance || 0);
+  totalAmount - advanceAmount;
 
 //   const balance = useMemo(
 //     () => Math.max(Number(form.rate || 0) - Number(form.advance || 0), 0),
@@ -252,7 +295,8 @@ const finalLrNo = isEdit
   : form.lrNo || (await generateNextLrNo(currentUser.uid));
   const payload = {
     ...form,
-    rate: Number(form.rate || 0),
+    rateQtl: Number(form.rateQtl || 0),
+rate: totalFreight,
     advance: Number(form.advance || 0),
     userId: currentUser.uid,
     companyName: userProfile?.companyName || "",
@@ -378,6 +422,7 @@ async function updateProfile() {
       source: trip.source || "",
       destination: trip.destination || "",
       mobile: trip.mobile || "",
+      rateQtl: String(trip.rateQtl || ""),
       rate: String(trip.rate || ""),
       advance: String(trip.advance || ""),
       notes: trip.notes || "",
@@ -386,9 +431,28 @@ async function updateProfile() {
       weight: trip.weight || "",
       unloadingCharges:
   trip.unloadingCharges || "",
+  partyGst: trip.partyGst || "",
+description: trip.description || "",
+vehicleType: trip.vehicleType || "",
+sizeL: trip.sizeL || "",
+sizeW: trip.sizeW || "",
+sizeH: trip.sizeH || "",
+rateQtl: trip.rateQtl || "",
+remark: trip.remark || "",
+gstPayBy: trip.gstPayBy || "",
     });
     setShowPanel(true);
   }
+
+  function handleLrReceipt(trip) {
+  navigate("/lr-receipt-preview", {
+    state: {
+      trip,
+      userProfile,
+    },
+  });
+}
+
   async function handleLogout() {
   await logoutUser();
 
@@ -536,6 +600,7 @@ async function updateProfile() {
               trips={filtered}
               onEdit={editTrip}
               onDelete={deleteTrip}
+              onLrReceipt={handleLrReceipt}
                 styles={styles}
             />
           </div>
@@ -563,29 +628,36 @@ async function updateProfile() {
 )}
             <Field icon={<Truck size={15} />} placeholder="Vehicle number" value={form.vehicle} onChange={(v) => update("vehicle", v)}/>
             <div style={styles.selectWrap}>
-  <select
-    style={styles.select}
-    value={form.partyName}
-    onChange={(e) =>
-      update("partyName", e.target.value)
-    }
-  >
-    <option value="">Select Party</option>
+ <select
+  style={styles.select}
+  value={form.partyId || ""}
+  onChange={(e) =>
+    handlePartySelect(e.target.value)
+  }
+>
+  <option value="">
+    Select Party
+  </option>
 
-    {parties.map((party) => (
-      <option
-        key={party.id}
-        value={party.partyName}
-      >
-        {party.partyName}
-      </option>
-    ))}
-  </select>
+  {parties.map((party) => (
+    <option
+      key={party.id}
+      value={party.id}
+    >
+      {party.partyName}
+    </option>
+  ))}
+</select>
 </div>
             <Field icon={<MapPin size={15} />} placeholder="Source" value={form.source} onChange={(v) => update("source", v)} />
             <Field icon={<MapPin size={15} />} placeholder="Destination" value={form.destination} onChange={(v) => update("destination", v)}/>
             <Field icon={<Phone size={15} />} placeholder="Driver mobile" value={form.mobile} onChange={(v) => update("mobile", v)} />
-            <Field icon={<IndianRupee size={15} />} placeholder="Rate" value={form.rate} onChange={(v) => update("rate", v)} />
+            <Field
+  icon={<IndianRupee size={15} />}
+  placeholder="Rate / Qtl"
+  value={form.rateQtl}
+  onChange={(v) => update("rateQtl", v)}
+/>
             <Field icon={<IndianRupee size={15} />} placeholder="Advance" value={form.advance} onChange={(v) => update("advance", v)}/>
             <Field
   icon={<IndianRupee size={15} />}
@@ -608,6 +680,99 @@ async function updateProfile() {
   value={form.weight}
   onChange={(v) => update("weight", v)}
 />
+
+
+<Field
+  icon={<FileText size={15} />}
+  placeholder="Party GST No"
+  value={form.partyGst}
+  onChange={(v) =>
+    update("partyGst", v)
+  }
+/>
+<Field
+  icon={<Package size={15} />}
+  placeholder="Description of Goods"
+  value={form.description}
+  onChange={(v) =>
+    update("description", v)
+  }
+/>
+<Field
+  icon={<Truck size={15} />}
+  placeholder="Vehicle Type"
+  value={form.vehicleType}
+  onChange={(v) =>
+    update("vehicleType", v)
+  }
+/>
+<div style={styles.sizeRow}>
+  <input
+    style={styles.input}
+    placeholder="L"
+    value={form.sizeL}
+    onChange={(e) =>
+      update("sizeL", e.target.value)
+    }
+  />
+
+  <input
+    style={styles.input}
+    placeholder="W"
+    value={form.sizeW}
+    onChange={(e) =>
+      update("sizeW", e.target.value)
+    }
+  />
+
+  <input
+    style={styles.input}
+    placeholder="H"
+    value={form.sizeH}
+    onChange={(e) =>
+      update("sizeH", e.target.value)
+    }
+  />
+</div>
+<Field
+  icon={<IndianRupee size={15} />}
+  placeholder="Rate / Qtl"
+  value={form.rateQtl}
+  onChange={(v) =>
+    update("rateQtl", v)
+  }
+/>
+<Field
+  icon={<StickyNote size={15} />}
+  placeholder="Remark"
+  value={form.remark}
+  onChange={(v) =>
+    update("remark", v)
+  }
+/>
+<select
+  style={styles.select}
+  value={form.gstPayBy}
+  onChange={(e) =>
+    update("gstPayBy", e.target.value)
+  }
+>
+  <option value="">
+    GST/Service Tax To Pay
+  </option>
+
+  <option value="consigner">
+    Consigner
+  </option>
+
+  <option value="consignee">
+    Consignee
+  </option>
+
+  <option value="transporter">
+    Transporter
+  </option>
+</select>
             <Field icon={<FileText size={15} />} placeholder="Notes" value={form.notes} onChange={(v) => update("notes", v)} />
 
            <div style={styles.amountSummary}>

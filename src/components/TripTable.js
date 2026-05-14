@@ -1,6 +1,6 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, ReceiptText  } from "lucide-react";
 
-export default function TripTable({ trips, onEdit, onDelete, styles }) {
+export default function TripTable({ trips, onEdit, onDelete, styles, onLrReceipt  }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -66,6 +66,14 @@ const balance = Math.max(
                     <Trash2 size={14} />
                     Delete
                   </button>
+                  
+                  <button
+  style={styles.invoiceButton}
+  onClick={() => onLrReceipt(trip)}
+>
+  <ReceiptText size={14} />
+  LR Receipt
+</button>
                 </td>
               </tr>
             );
